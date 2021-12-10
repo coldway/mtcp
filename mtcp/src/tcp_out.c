@@ -235,7 +235,7 @@ SendTCPPacket(struct mtcp_manager *mtcp, tcp_stream *cur_stream,
 		TRACE_ERROR("Payload size exceeds MSS\n");
 		return ERROR;
 	}
-
+   //这里申请的这块内存其实就是dpdk底层的一块。在后面的copy会把要发送的数据copy过来，通过core的mtcp->iom->send_pkts(ctx, tx_inf); 就会把相应的数据发送出去
 	tcph = (struct tcphdr *)IPOutput(mtcp, cur_stream, 
 			TCP_HEADER_LEN + optlen + payloadlen);
 	if (tcph == NULL) {

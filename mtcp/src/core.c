@@ -838,11 +838,12 @@ RunMainLoop(struct mtcp_thread_context *ctx)
 			/* hadnle stream queues  */
 			HandleApplicationCalls(mtcp, ts);
 		}
-
+        //写包的数据到DPDK负责的buffer上
 		WritePacketsToChunks(mtcp, ts);
 
 		/* send packets from write buffer */
 		/* send until tx is available */
+		// 这里其实是调用dpdk进行真是的包发送
 		for (tx_inf = 0; tx_inf < CONFIG.eths_num; tx_inf++) {
 			mtcp->iom->send_pkts(ctx, tx_inf);
 		}

@@ -54,7 +54,7 @@ EthernetOutput(struct mtcp_manager *mtcp, uint16_t h_proto,
 		TRACE_INFO("No interface selected!\n");
 		return NULL;
 	}
-	
+	//这里在某一个cpu上申请了一块内存buff
 	buf = mtcp->iom->get_wptr(mtcp->ctx, eidx, iplen + ETHERNET_HEADER_LEN);
 	if (!buf) {
 		//TRACE_DBG("Failed to get available write buffer\n");

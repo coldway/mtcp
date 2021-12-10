@@ -749,10 +749,25 @@ CreateNewFlowHTEntry(mtcp_manager_t mtcp, uint32_t cur_ts, const struct iphdr *i
 static inline void 
 Handle_TCP_ST_LISTEN (mtcp_manager_t mtcp, uint32_t cur_ts, 
 		tcp_stream* cur_stream, struct tcphdr* tcph) {
-	
+
+//    LISTEN状态只能是LISTEN的stream处理
+//    采用注释的写法更加优雅
+//
+//    if (!tcph->sync){
+//        CTRACE_ERROR("Stream %d (TCP_ST_LISTEN): "
+//                     "Packet without SYN.\n", cur_stream->id);
+//    }
+//    if (cur_stream->state == TCP_ST_LISTEN)
+//        cur_stream->rcv_nxt++; //如果是监听的stream 就会把 rcv_nxt+1
+//    //收到一个syn 建连pkg就会把状态改为 rcvd 状态
+//    cur_stream->state = TCP_ST_SYN_RCVD;
+//    TRACE_STATE("Stream %d: TCP_ST_SYN_RCVD\n", cur_stream->id);
+//    AddtoControlList(mtcp, cur_stream, cur_ts);
+
 	if (tcph->syn) {
 		if (cur_stream->state == TCP_ST_LISTEN)
-			cur_stream->rcv_nxt++;
+			cur_stream->rcv_nxt++; //如果是监听的stream 就会把 rcv_nxt+1
+		//收到一个syn 建连pkg就会把状态改为 syn rcvd 状态
 		cur_stream->state = TCP_ST_SYN_RCVD;
 		TRACE_STATE("Stream %d: TCP_ST_SYN_RCVD\n", cur_stream->id);
 		AddtoControlList(mtcp, cur_stream, cur_ts);
@@ -868,12 +883,15 @@ Handle_TCP_ST_SYN_RCVD (mtcp_manager_t mtcp, uint32_t cur_ts,
 		cur_stream->rcv_nxt = cur_stream->rcvvar->irs + 1;
 		RemoveFromRTOList(mtcp, cur_stream);
 
+        //收到ack 状态改为已建连
 		cur_stream->state = TCP_ST_ESTABLISHED;
 		TRACE_STATE("Stream %d: TCP_ST_ESTABLISHED\n", cur_stream->id);
 
 		/* update listening socket */
+		//获取到listener。listener->socket拿出socket
 		listener = (struct tcp_listener *)ListenerHTSearch(mtcp->listeners, &tcph->dest);
 
+		//加入到listener accept队列
 		ret = StreamEnqueue(listener->acceptq, cur_stream);
 		if (ret < 0) {
 			TRACE_ERROR("Stream %d: Failed to enqueue to "
@@ -881,6 +899,7 @@ Handle_TCP_ST_SYN_RCVD (mtcp_manager_t mtcp, uint32_t cur_ts,
 			cur_stream->close_reason = TCP_NOT_ACCEPTED;
 			cur_stream->state = TCP_ST_CLOSED;
 			TRACE_STATE("Stream %d: TCP_ST_CLOSED\n", cur_stream->id);
+			//发送关闭请求list
 			AddtoControlList(mtcp, cur_stream, cur_ts);
 		}
 		//TRACE_DBG("Stream %d inserted into acceptq.\n", cur_stream->id);
@@ -1251,6 +1270,7 @@ ProcessTCPPacket(mtcp_manager_t mtcp,
 
 	if (!(cur_stream = StreamHTSearch(mtcp->tcp_flow_table, &s_stream))) {
 		/* not found in flow table */
+		//新建一个stream
 		cur_stream = CreateNewFlowHTEntry(mtcp, cur_ts, iph, ip_len, tcph, 
 				seq, ack_seq, payloadlen, window);
 		if (!cur_stream)
@@ -1297,7 +1317,8 @@ ProcessTCPPacket(mtcp_manager_t mtcp,
 
 	switch (cur_stream->state) {
 	case TCP_ST_LISTEN:
-		Handle_TCP_ST_LISTEN(mtcp, cur_ts, cur_stream, tcph);
+        //调用CreateTCPStream方法后就会有一个LISTEN的stream进行监听
+        Handle_TCP_ST_LISTEN(mtcp, cur_ts, cur_stream, tcph);
 		break;
 
 	case TCP_ST_SYN_SENT:
